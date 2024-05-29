@@ -3,8 +3,11 @@ const userModel = require("../models/userModel");
 const bcrypt = require("bcryptjs");
 const adminModel = require("../models/adminModel");
 const jwt = require("jsonwebtoken");
+const otpGenerator = require("otp-generator");
+const nodemailer = require("nodemailer");
 
 const router = express.Router();
+require("dotenv").config();
 
 // Hash password
 const hashFunction = async (pass) => {
@@ -18,12 +21,63 @@ const hashFunction = async (pass) => {
   }
 };
 
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.USER,
+    pass: process.env.PASS,
+  },
+});
+
+//send otp
+router.post("/sendOtp", async (req, res) => {
+  try {
+    const email = req.body.email;
+    const otp = otpGenerator.generate(6, {
+      digits: true,
+      alphabets: false,
+      upperCase: false,
+      specialChars: false,
+    });
+
+    // Send OTP to the user's email
+    await transporter.sendMail({
+      to: email,
+      subject: "Your MyMessenger Signup Verification Code",
+      text: `Welcome,
+
+              Thank you for signing up with MyMessenger. To complete your registration, please use the following verification code:
+
+              Verification Code: ${otp}
+
+              If you did not request this code, please ignore this email.
+
+              Best regards,
+              MyMessenger Support Team`,
+              html: `<p>Dear User,</p>
+                <p>Thank you for signing up with <strong>MyMessenger</strong>. To complete your registration, please use the following verification code:</p>
+                <h2>${otp}</h2>
+                <p>If you did not request this code, please ignore this email.</p>
+                <p>Best regards,</p>
+                <p><strong>MyMessenger Support Team</strong></p>`,
+    });
+
+    return res.json({
+      status: "success",
+      otp: otp,
+    });
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+});
+
 // USER signup
 router.post("/signup", async (req, res) => {
   try {
     let { firstName, lastName, email, password } = req.body;
     if (!firstName || !lastName || !email || !password) {
-      return res.status(400).json({
+      return res.json({
         status: "error",
         message: "input not completed",
       });
@@ -31,11 +85,12 @@ router.post("/signup", async (req, res) => {
 
     let existingUser = await userModel.findOne({ email: email });
     if (existingUser) {
-      return res.status(400).json({
+      return res.json({
         status: "error",
         message: "already existing user",
       });
     }
+
     let hashedPassword = await hashFunction(password);
     let newUser = new userModel({
       firstName,
@@ -43,6 +98,7 @@ router.post("/signup", async (req, res) => {
       email,
       password: hashedPassword,
     });
+
     await newUser.save();
     return res.status(201).json({
       status: "success",

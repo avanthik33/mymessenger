@@ -61,6 +61,14 @@ router.get("/:id", protectRoute, async (req, res) => {
       .populate("messages")
       .exec();
 
+    if (!conversation) {
+      return res.json({
+        status: "error",
+        message: "Conversation not found",
+        data: [],
+      });
+    }
+
     return res.json({
       status: "success",
       data: conversation.messages,
@@ -73,4 +81,5 @@ router.get("/:id", protectRoute, async (req, res) => {
     });
   }
 });
+
 module.exports = router;
